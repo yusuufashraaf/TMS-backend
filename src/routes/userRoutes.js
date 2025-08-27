@@ -7,7 +7,7 @@ const authMiddleware = require("../middlewares/authorizationMiddleware");
 router.use(authMiddleware.protect);
 
 // CRUD routes
-router.get("/", userController.getAllUsers); // Get all users
+router.get("/", authMiddleware.restrictTo("Admin"), userController.getAllUsers); // Get all users
 router.get("/:id", userController.getUserById); // Get single user
 router.put("/:id", userController.updateUser); // Update user
 
