@@ -1,5 +1,7 @@
 const Project = require("../models/Project");
 const User = require("../models/User");
+const mongoose = require("mongoose");
+const Task = require("../models/Task");
 const joi = require("joi");
 
 // Validation schema for creating/updating project
@@ -148,22 +150,36 @@ exports.updateProject = async (req, res) => {
   }
 };
 
-// Delete project (any authenticated user can delete)
+// Delete project
 exports.deleteProject = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findById(req.params.id).session(session);
     if (!project) {
+      await session.abortTransaction();
+      session.endSession();
       return res
         .status(404)
         .json({ status: "failed", message: "Project not found" });
     }
 
-    await project.remove();
+    // Delete all tasks belonging to this project
+    await Task.deleteMany({ project: project._id }).session(session);
 
-    res
-      .status(200)
-      .json({ status: "success", message: "Project deleted successfully" });
+    // Delete the project
+    await project.deleteOne({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(200).json({
+      status: "success",
+      message: "Project and its tasks deleted successfully",
+    });
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
     res.status(500).json({ status: "failed", message: err.message });
   }
 };
