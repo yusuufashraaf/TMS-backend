@@ -1,10 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const projectController = require("../controllers/projectController");
-const { protect, restrictTo } = require("../middlewares/auth");
+const {
+  protect,
+  restrictTo,
+} = require("../middlewares/authorizationMiddleware");
 
 // Only admins can create projects
-router.post("/", protect, restrictTo("admin"), projectController.createProject);
+router.post("/", protect, restrictTo("Admin"), projectController.createProject);
 
 // Any authenticated user can update projects
 router.put("/:id", protect, projectController.updateProject);
@@ -17,7 +20,7 @@ router.get("/:id", projectController.getProjectById);
 router.delete(
   "/:id",
   protect,
-  restrictTo("admin"),
+  restrictTo("Admin"),
   projectController.deleteProject
 );
 
