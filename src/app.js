@@ -3,6 +3,9 @@ const userRoutes = require("./routes/userRoutes");
 const authRoutes = require("./routes/authRoutes");
 const projectRoutes = require("./routes/projectRoutes");
 const taskRoutes = require("./routes/taskRoutes");
+const pdfRoutes = require("./routes/pdfRoutes");
+const { restrictTo } = require("./middlewares/authorizationMiddleware");
+
 const app = express();
 
 // Middlewares
@@ -13,6 +16,8 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/projects", projectRoutes);
 app.use("/api/v1/tasks", taskRoutes);
+app.use("/api/v1/pdf", pdfRoutes);
+
 // 404 handler
 app.use((req, res, next) => {
   res
