@@ -73,8 +73,8 @@ exports.login = async (req, res) => {
     }
 
     const { email, password } = value;
-    const user = await User.findOne({ email });
-    if (!user || !(await user.correctPassword(password))) {
+    const user = await User.findOne({ email }).select("+password");
+    if (!user || !(await user.comparePassword(password))) {
       return res
         .status(401)
         .json({ status: "failed", message: "Email or Password is incorrect" });
