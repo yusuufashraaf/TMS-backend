@@ -20,4 +20,16 @@ const protect = (req, res, next) => {
   }
 };
 
-module.exports = protect;
+// Restrict access based on roles
+const restrictTo = (role) => {
+  return (req, res, next) => {
+    if (req.user.role !== role) {
+      return res
+        .status(403)
+        .json({ status: "failed", message: "You do not have permission" });
+    }
+    next();
+  };
+};
+
+module.exports = { protect, restrictTo };
