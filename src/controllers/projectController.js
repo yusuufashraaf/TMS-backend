@@ -39,7 +39,7 @@ exports.createProject = async (req, res) => {
     const project = await Project.create({
       name,
       description,
-      createdBy: req.user._id,
+      createdBy: req.user.id,
       members,
     });
 
