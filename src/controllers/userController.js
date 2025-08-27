@@ -1,18 +1,6 @@
 const User = require("../models/User");
 const joi = require("joi");
 
-// Validate user's data before sending to database
-const userValidationSchema = joi.object({
-  name: joi.string().max(50).required(),
-  email: joi.string().email().required(),
-  password: joi
-    .string()
-    .min(12) // Min 12 characters
-    .pattern(new RegExp("^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])"))
-    .required(),
-  role: joi.string().valid("Admin", "User").optional(),
-});
-
 // Validate user's data before sending to database (for updates)
 const userUpdateSchema = joi.object({
   name: joi.string().max(50).optional(),
@@ -24,46 +12,6 @@ const userUpdateSchema = joi.object({
     .optional(),
   role: joi.string().valid("Admin", "User").optional(),
 });
-
-// Create a new user
-exports.createUser = async (req, res) => {
-  try {
-    // Validate request body
-    const { error, value } = userValidationSchema.validate(req.body, {
-      abortEarly: false,
-    });
-    if (error) {
-      const errors = error.details.map((err) => err.message);
-      return res
-        .status(400)
-        .json({ status: "failed", message: errors, data: null });
-    }
-
-    // Check if email already exists
-    const existingEmail = await User.findOne({ email: value.email });
-    if (existingEmail) {
-      return res.status(400).json({
-        status: "failed",
-        message: `Email ${value.email} already exists`,
-        data: null,
-      });
-    }
-
-    // Create user and exclude password
-    const user = await User.create(value);
-    const { password, ...userData } = user.toObject();
-
-    res.status(201).json({
-      status: "success",
-      message: "User created successfully",
-      data: userData,
-    });
-  } catch (err) {
-    res
-      .status(500)
-      .json({ status: "failed", message: err.message, data: null });
-  }
-};
 
 // Get all users with pagination
 exports.getAllUsers = async (req, res) => {
