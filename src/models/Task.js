@@ -6,9 +6,10 @@ const taskSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Project",
       required: true,
+      index: true,
     },
-    title: { type: String, required: true },
-    description: { type: String },
+    title: { type: String, required: true, trim: true, maxlength: 100 },
+    description: { type: String, trim: true, maxlength: 1000 },
     priority: {
       type: String,
       enum: ["Low", "Medium", "High"],
@@ -18,12 +19,23 @@ const taskSchema = new mongoose.Schema(
       type: String,
       enum: ["Pending", "In Progress", "Completed"],
       default: "Pending",
+      index: true,
     },
-    deadline: { type: Date, required: true },
+    deadline: {
+      type: Date,
+      required: true,
+      validate: {
+        validator: function (value) {
+          return value > Date.now();
+        },
+        message: "Deadline must be in the future",
+      },
+    },
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
