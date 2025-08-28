@@ -62,16 +62,14 @@ exports.createTask = async (req, res) => {
   }
 };
 
-// Get all tasks
 exports.getAllTasks = async (req, res) => {
   try {
     let { status, priority, sortBy, page = 1, limit = 10 } = req.query;
     page = Math.max(parseInt(page, 10) || 1);
     limit = Math.max(parseInt(limit, 10) || 10);
 
-    const query = {
-      $or: [{ createdBy: req.user.id }, { assignedTo: req.user.id }],
-    };
+    // Query object
+    const query = {}; // empty = all tasks
 
     if (status) query.status = status;
     if (priority) query.priority = priority;
