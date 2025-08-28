@@ -203,3 +203,51 @@ exports.deleteTask = async (req, res) => {
     res.status(500).json({ status: "failed", message: err.message });
   }
 };
+
+exports.getDashboardStats = async (req, res) => {
+  try {
+    // Total tasks
+    const totalTasks = await Task.countDocuments();
+
+    // Completed tasks
+    const completedTasks = await Task.countDocuments({ status: "Completed" });
+
+    // Pending tasks
+    const pendingTasks = await Task.countDocuments({ status: "Pending" });
+
+    // Overdue tasks not completed and deadline passed
+    const overdueTasks = await Task.countDocuments({
+      status: { $ne: "Completed" },
+      deadline: { $lt: new Date() },
+    });
+
+    // Tasks created this month
+    const startOfMonth = new Date(
+      new Date().getFullYear(),
+      new Date().getMonth(),
+      1
+    );
+    const endOfMonth = new Date(
+      new Date().getFullYear(),
+      new Date().getMonth() + 1,
+      0
+    );
+
+    const tasksThisMonth = await Task.countDocuments({
+      createdAt: { $gte: startOfMonth, $lte: endOfMonth },
+    });
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        totalTasks,
+        completedTasks,
+        pendingTasks,
+        overdueTasks,
+        tasksThisMonth,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "failed", message: err.message });
+  }
+};
