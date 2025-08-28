@@ -237,6 +237,17 @@ exports.getDashboardStats = async (req, res) => {
       createdAt: { $gte: startOfMonth, $lte: endOfMonth },
     });
 
+    // Priority counts
+    const highPriority = await Task.countDocuments({ priority: "High" });
+    const mediumPriority = await Task.countDocuments({ priority: "Medium" });
+    const lowPriority = await Task.countDocuments({ priority: "Low" });
+
+    const priorityData = [
+      { name: "High", value: highPriority },
+      { name: "Medium", value: mediumPriority },
+      { name: "Low", value: lowPriority },
+    ];
+
     res.status(200).json({
       status: "success",
       data: {
@@ -245,6 +256,7 @@ exports.getDashboardStats = async (req, res) => {
         pendingTasks,
         overdueTasks,
         tasksThisMonth,
+        priorityData,
       },
     });
   } catch (err) {
