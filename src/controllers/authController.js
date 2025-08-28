@@ -98,3 +98,15 @@ exports.login = async (req, res) => {
     res.status(500).json({ status: "failed", message: err.message });
   }
 };
+
+// Logout Controller
+exports.logout = async (req, res) => {
+  try {
+    res.status(200).json({
+      status: "success",
+      message: "Logged out successfully",
+    });
+  } catch (err) {
+    res.status(500).json({ status: "failed", message: err.message });
+  }
+};
