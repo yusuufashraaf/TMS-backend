@@ -22,7 +22,7 @@ const loginSchema = joi.object({
 // Internal JWT generator
 const generateToken = (user) => {
   return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
-    expiresIn: "1h",
+    expiresIn: process.env.JWT_EXPIRES_IN,
   });
 };
 
