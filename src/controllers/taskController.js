@@ -156,42 +156,43 @@ exports.getTaskById = async (req, res) => {
 };
 
 // Update task (only if related to user)
+// Update task (Admin can update any, others only if related)
 exports.updateTask = async (req, res) => {
   try {
     const { error, value } = taskSchema.validate(req.body, {
       presence: "optional",
     });
-    if (error)
+    if (error) {
       return res.status(400).json({
         status: "failed",
         message: error.details.map((d) => d.message),
       });
+    }
 
-    // Only allow assignedTo as string (userId)
+    // Validate assigned user if provided
     if (value.assignedTo) {
-      if (typeof value.assignedTo === "object" && value.assignedTo._id) {
-        value.assignedTo = value.assignedTo._id;
-      }
-
       const userExists = await validateUserExist(value.assignedTo);
-      if (!userExists)
+      if (!userExists) {
         return res.status(400).json({
           status: "failed",
           message: "Assigned user does not exist",
         });
+      }
     }
 
-    // Prevent _id from being updated
     delete value._id;
 
-    const task = await Task.findOneAndUpdate(
-      {
-        _id: req.params.id,
-        $or: [{ createdBy: req.user.id }, { assignedTo: req.user.id }],
-      },
-      value,
-      { new: true, runValidators: true }
-    );
+    // If Admin → can update any task
+    // Else → only update if user is creator or assignee
+    let query = { _id: req.params.id };
+    if (req.user.role !== "Admin") {
+      query.$or = [{ createdBy: req.user.id }, { assignedTo: req.user.id }];
+    }
+
+    const task = await Task.findOneAndUpdate(query, value, {
+      new: true,
+      runValidators: true,
+    });
 
     if (!task) {
       return res.status(404).json({
