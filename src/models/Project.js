@@ -23,13 +23,13 @@ const projectSchema = new mongoose.Schema(
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
-        unique: true,
       },
     ],
   },
   { timestamps: true }
 );
 
-projectSchema.index({ name: 1, createdBy: 1 });
+// only enforce unique project names per creator
+projectSchema.index({ name: 1, createdBy: 1 }, { unique: true });
 
 module.exports = mongoose.model("Project", projectSchema);
