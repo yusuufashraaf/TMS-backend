@@ -49,18 +49,35 @@ exports.createTask = async (req, res) => {
       });
     }
 
-    // Check assigned users exist
-    const userExists = await User.findById(value.assignedTo);
-    if (!userExists) {
-      return res.status(400).json({
-        status: "failed",
-        message: "Assigned user does not exist",
-      });
+    // Check assigned user exists
+    if (value.assignedTo) {
+      const userExists = await User.findById(value.assignedTo);
+      if (!userExists) {
+        return res.status(400).json({
+          status: "failed",
+          message: "Assigned user does not exist",
+        });
+      }
     }
+
     const task = await Task.create({
       ...value,
       createdBy: req.user.id,
     });
+
+    // --- Socket.IO notification ---
+    const io = req.app.get("io");
+    const onlineUsers = req.app.get("onlineUsers");
+
+    if (value.assignedTo) {
+      const socketId = onlineUsers.get(value.assignedTo);
+      if (socketId) {
+        io.to(socketId).emit("new-task", {
+          message: "You have a new task assigned!",
+          task,
+        });
+      }
+    }
 
     res.status(201).json({ status: "success", data: task });
   } catch (err) {
