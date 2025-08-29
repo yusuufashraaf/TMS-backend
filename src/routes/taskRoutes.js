@@ -9,19 +9,26 @@ const {
 // All routes require authentication
 router.use(protect);
 
-// Create a new task (any authenticated user)
+// Dashboard stats (must be before /:id)
+router.get("/dashboard-stats", taskController.getDashboardStats);
+
+// User-specific routes
+router.get("/my-tasks", taskController.getMyTasks);
+router.patch("/:id/status", taskController.updateMyTaskStatus);
+
+// Create a new task (Admin only)
 router.post("/", restrictTo("Admin"), taskController.createTask);
 
-// Get all tasks (only tasks related to logged-in user)
-router.get("/", taskController.getAllTasks);
+// Get all tasks (Admin only)
+router.get("/", restrictTo("Admin"), taskController.getAllTasks);
 
-// Get single task by ID (only if related to user)
-router.get("/:id", taskController.getTaskById);
+// Get single task by ID (Admin only)
+router.get("/:id", restrictTo("Admin"), taskController.getTaskById);
 
-// Update task (only if related to user)
+// Update task (Admin only)
 router.put("/:id", restrictTo("Admin"), taskController.updateTask);
 
-// Delete task (only if related to user)
+// Delete task (Admin only)
 router.delete("/:id", restrictTo("Admin"), taskController.deleteTask);
 
 module.exports = router;

@@ -113,7 +113,7 @@ exports.generateProjectPDF = async (req, res) => {
     tasks.forEach((task, index) => {
       const rowData = [
         task.title,
-        task.assignedTo?.name || "N/A",
+        task.assignedTo?.email || "N/A",
         task.priority,
         task.status,
         task.deadline ? task.deadline.toDateString() : "N/A",

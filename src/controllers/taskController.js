@@ -273,3 +273,78 @@ exports.getDashboardStats = async (req, res) => {
     res.status(500).json({ status: "failed", message: err.message });
   }
 };
+
+exports.getMyTasks = async (req, res) => {
+  try {
+    let { status, priority, sortBy, page = 1, limit = 10 } = req.query;
+    page = Math.max(parseInt(page, 10) || 1);
+    limit = Math.max(parseInt(limit, 10) || 10);
+
+    const query = {
+      assignedTo: req.user.id,
+    };
+
+    if (status) query.status = status;
+    if (priority) query.priority = priority;
+
+    let sortOptions = { createdAt: -1 };
+    if (sortBy) {
+      sortOptions = {};
+      sortBy.split(",").forEach((fieldDir) => {
+        const [field, dir] = fieldDir.split(":");
+        if (["deadline", "priority", "createdAt"].includes(field)) {
+          sortOptions[field] = dir === "desc" ? -1 : 1;
+        }
+      });
+    }
+
+    const tasks = await Task.find(query)
+      .populate("projectId", "name")
+      .populate("assignedTo", "name email")
+      .populate("createdBy", "name email")
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .sort(sortOptions);
+
+    const total = await Task.countDocuments(query);
+
+    res.status(200).json({
+      status: "success",
+      results: tasks.length,
+      total,
+      page,
+      data: tasks,
+    });
+  } catch (err) {
+    res.status(500).json({ status: "failed", message: err.message });
+  }
+};
+
+exports.updateMyTaskStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    if (!["Pending", "In Progress", "Completed"].includes(status)) {
+      return res
+        .status(400)
+        .json({ status: "failed", message: "Invalid status" });
+    }
+
+    const task = await Task.findOneAndUpdate(
+      { _id: req.params.id, assignedTo: req.user.id },
+      { status },
+      { new: true }
+    );
+
+    if (!task) {
+      return res.status(404).json({
+        status: "failed",
+        message: "Task not found or not assigned to you",
+      });
+    }
+
+    res.status(200).json({ status: "success", data: task });
+  } catch (err) {
+    res.status(500).json({ status: "failed", message: err.message });
+  }
+};
