@@ -102,7 +102,7 @@ PORT=8000
 DATABASE=mongodb+srv://<username>:<db_password>@cluster.mongodb.net/tms
 DATABASE_PASSWORD=yourpassword
 JWT_SECRET=yourjwtsecret
-JWT_EXPIRES_IN=1h
+JWT_EXPIRES_IN=3600
 ```
 
 ---
