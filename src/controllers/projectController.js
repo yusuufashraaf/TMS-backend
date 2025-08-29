@@ -214,7 +214,7 @@ exports.deleteProject = async (req, res) => {
         .json({ status: "failed", message: "Project not found" });
     }
 
-    await Task.deleteMany({ project: project._id }).session(session);
+    await Task.deleteMany({ projectId: project._id }).session(session);
     await project.deleteOne({ session });
 
     await session.commitTransaction();
