@@ -8,17 +8,17 @@ const joi = require("joi");
 const projectSchema = joi.object({
   name: joi.string().max(100).required(),
   description: joi.string().max(1000).required(),
-  members: joi.array().items(joi.string().hex().length(24)),
+  members: joi.array().items(joi.string().hex().length(24)).optional(),
 });
 
-// Helper function for DRY
+// Helper function to check if all members exist
 const validateMembersExist = async (members) => {
   if (!members || members.length === 0) return true;
   const existingMembers = await User.find({ _id: { $in: members } });
   return existingMembers.length === members.length;
 };
 
-// Create project
+// ---------------------- Create Project ----------------------
 exports.createProject = async (req, res) => {
   try {
     const { error, value } = projectSchema.validate(req.body);
@@ -29,9 +29,7 @@ exports.createProject = async (req, res) => {
       });
     }
 
-    const { name, description, members } = value;
-
-    const membersValid = await validateMembersExist(members);
+    const membersValid = await validateMembersExist(value.members);
     if (!membersValid)
       return res.status(400).json({
         status: "failed",
@@ -39,10 +37,8 @@ exports.createProject = async (req, res) => {
       });
 
     const project = await Project.create({
-      name,
-      description,
+      ...value,
       createdBy: req.user.id,
-      members,
     });
 
     res.status(201).json({ status: "success", data: project });
@@ -51,97 +47,151 @@ exports.createProject = async (req, res) => {
   }
 };
 
-// Get all projects
-exports.getAllProjects = async (req, res) => {
+// Get All Projects With Tasks
+exports.getProjectsWithTasks = async (req, res) => {
   try {
-    let { page = 1, limit = 10, search } = req.query;
-    page = Math.max(parseInt(page, 10) || 1);
-    limit = Math.max(parseInt(limit, 10) || 10);
-    const skip = (page - 1) * limit;
+    const projects = await Project.find().lean();
 
-    let query = {};
-    if (search) {
-      query = {
-        $or: [
-          { name: { $regex: search, $options: "i" } },
-          { description: { $regex: search, $options: "i" } },
-        ],
-      };
-    }
+    const projectsWithTasks = await Promise.all(
+      projects.map(async (project) => {
+        const tasks = await Task.find({ project: project._id })
+          .populate("assignedTo", "name email")
+          .populate("createdBy", "name email")
+          .lean();
 
-    const projects = await Project.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate("createdBy", "name email")
-      .populate("members", "name email");
-
-    const total = await Project.countDocuments(query);
+        return {
+          ...project,
+          tasks,
+        };
+      })
+    );
 
     res.status(200).json({
       status: "success",
-      results: projects.length,
-      total,
-      page,
-      data: projects,
+      results: projectsWithTasks.length,
+      data: projectsWithTasks,
     });
   } catch (err) {
     res.status(500).json({ status: "failed", message: err.message });
   }
 };
 
-// Get project by ID
+// Get All Projects
+exports.getAllProjects = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = "" } = req.query;
+
+    const query = search ? { name: { $regex: search, $options: "i" } } : {};
+
+    const projects = await Project.find(query)
+      .populate("createdBy", "name email")
+      .populate("members", "name email")
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit))
+      .sort({ createdAt: -1 });
+
+    const totalProjects = await Project.countDocuments(query);
+
+    const projectsWithStats = await Promise.all(
+      projects.map(async (project) => {
+        const totalTasks = await Task.countDocuments({ project: project._id });
+        const tasksCompleted = await Task.countDocuments({
+          project: project._id,
+          status: "completed",
+        });
+
+        return {
+          ...project.toObject(),
+          totalTasks,
+          tasksCompleted,
+          progress: totalTasks
+            ? Math.round((tasksCompleted / totalTasks) * 100)
+            : 0,
+        };
+      })
+    );
+
+    res.json({
+      status: "success",
+      totalProjects,
+      totalPages: Math.ceil(totalProjects / limit),
+      currentPage: Number(page),
+      data: projectsWithStats,
+    });
+  } catch (error) {
+    res.status(500).json({ status: "failed", message: error.message });
+  }
+};
+
+//  Get Single Project By ID
 exports.getProjectById = async (req, res) => {
   try {
     const project = await Project.findById(req.params.id)
       .populate("createdBy", "name email")
       .populate("members", "name email");
 
-    if (!project) {
+    if (!project)
       return res
         .status(404)
         .json({ status: "failed", message: "Project not found" });
-    }
 
-    res.status(200).json({ status: "success", data: project });
-  } catch (err) {
-    res.status(500).json({ status: "failed", message: err.message });
+    const totalTasks = await Task.countDocuments({ project: project._id });
+    const tasksCompleted = await Task.countDocuments({
+      project: project._id,
+      status: "completed",
+    });
+
+    res.json({
+      status: "success",
+      data: {
+        ...project.toObject(),
+        totalTasks,
+        tasksCompleted,
+        progress: totalTasks
+          ? Math.round((tasksCompleted / totalTasks) * 100)
+          : 0,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ status: "failed", message: error.message });
   }
 };
 
-// Update project (any authenticated user can update)
+// Update Project ----------------------
 exports.updateProject = async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
-    if (!project) {
+    if (!project)
       return res
         .status(404)
         .json({ status: "failed", message: "Project not found" });
-    }
 
-    const { error, value } = projectSchema.validate(req.body);
-    if (error) {
+    // Remove fields that should not be updated
+    const { _id, createdBy, createdAt, updatedAt, __v, ...body } = req.body;
+
+    // Validate only allowed fields
+    const { error, value } = projectSchema.validate(body, {
+      allowUnknown: false,
+    });
+    if (error)
       return res.status(400).json({
         status: "failed",
         message: error.details.map((d) => d.message),
       });
-    }
 
-    const { members } = value;
-    const membersValid = await validateMembersExist(members);
+    // Check that all members exist
+    const membersValid = await validateMembersExist(value.members);
     if (!membersValid)
       return res.status(400).json({
         status: "failed",
         message: "Some members do not exist",
       });
 
+    // Update project
     const updatedProject = await Project.findByIdAndUpdate(
       req.params.id,
       value,
-      {
-        new: true,
-        runValidators: true,
-      }
+      { new: true, runValidators: true }
     );
 
     res.status(200).json({ status: "success", data: updatedProject });
@@ -150,7 +200,7 @@ exports.updateProject = async (req, res) => {
   }
 };
 
-// Delete project
+//  Delete Project
 exports.deleteProject = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -164,10 +214,7 @@ exports.deleteProject = async (req, res) => {
         .json({ status: "failed", message: "Project not found" });
     }
 
-    // Delete all tasks belonging to this project
     await Task.deleteMany({ project: project._id }).session(session);
-
-    // Delete the project
     await project.deleteOne({ session });
 
     await session.commitTransaction();

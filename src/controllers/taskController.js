@@ -14,7 +14,7 @@ const taskSchema = joi.object({
     .valid("Pending", "In Progress", "Completed")
     .default("Pending"),
   deadline: joi.date().optional(),
-  assignedTo: joi.array().items(joi.string().hex().length(24)).optional(),
+  assignedTo: joi.string().hex().length(24).optional(),
 });
 
 // Helper function to check if all assigned users exist
@@ -22,6 +22,12 @@ const validateUsersExist = async (users) => {
   if (!users || users.length === 0) return true;
   const existingUsers = await User.find({ _id: { $in: users } });
   return existingUsers.length === users.length;
+};
+// Helper to check if assigned user exists
+const validateUserExist = async (userId) => {
+  if (!userId) return true;
+  const user = await User.findById(userId);
+  return !!user;
 };
 
 // Create Task
@@ -44,13 +50,13 @@ exports.createTask = async (req, res) => {
     }
 
     // Check assigned users exist
-    const usersValid = await validateUsersExist(value.assignedTo);
-    if (!usersValid)
+    const userExists = await User.findById(value.assignedTo);
+    if (!userExists) {
       return res.status(400).json({
         status: "failed",
-        message: "Some assigned users do not exist",
+        message: "Assigned user does not exist",
       });
-
+    }
     const task = await Task.create({
       ...value,
       createdBy: req.user.id,
@@ -144,15 +150,22 @@ exports.updateTask = async (req, res) => {
         message: error.details.map((d) => d.message),
       });
 
-    // Validate assigned users if present
+    // Only allow assignedTo as string (userId)
     if (value.assignedTo) {
-      const usersValid = await validateUsersExist(value.assignedTo);
-      if (!usersValid)
+      if (typeof value.assignedTo === "object" && value.assignedTo._id) {
+        value.assignedTo = value.assignedTo._id;
+      }
+
+      const userExists = await validateUserExist(value.assignedTo);
+      if (!userExists)
         return res.status(400).json({
           status: "failed",
-          message: "Some assigned users do not exist",
+          message: "Assigned user does not exist",
         });
     }
+
+    // Prevent _id from being updated
+    delete value._id;
 
     const task = await Task.findOneAndUpdate(
       {
@@ -175,7 +188,6 @@ exports.updateTask = async (req, res) => {
     res.status(500).json({ status: "failed", message: err.message });
   }
 };
-
 // Delete task
 exports.deleteTask = async (req, res) => {
   try {
